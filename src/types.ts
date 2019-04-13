@@ -334,7 +334,8 @@ export type InvokesConfig<TContext, TEvent extends EventObject> = SingleOrArray<
 export interface StateNodeConfig<
   TContext,
   TStateSchema extends StateSchema,
-  TEvent extends EventObject
+  TEvent extends EventObject,
+  TInitial extends keyof TStateSchema['states'] = keyof TStateSchema['states']
 > {
   /**
    * The relative key of the state node, which represents its location in the overall state value.
@@ -344,7 +345,7 @@ export interface StateNodeConfig<
   /**
    * The initial state node key.
    */
-  initial?: keyof TStateSchema['states'] | undefined;
+  initial?: TInitial;
   /**
    * @deprecated
    */
@@ -362,7 +363,7 @@ export interface StateNodeConfig<
   /**
    * The initial context (extended state) of the machine.
    */
-  context?: TContext;
+  context?: ContextMap<TStateSchema>[TInitial];
   /**
    * Indicates whether the state node is a history state node, and what
    * type of history:
@@ -497,19 +498,21 @@ export interface FinalStateNodeConfig<TContext, TEvent extends EventObject>
 export interface CompoundStateNodeConfig<
   TContext,
   TStateSchema extends StateSchema,
-  TEvent extends EventObject
-> extends StateNodeConfig<TContext, TStateSchema, TEvent> {
+  TEvent extends EventObject,
+  TInitial extends keyof TStateSchema['states'] = keyof TStateSchema['states']
+> extends StateNodeConfig<TContext, TStateSchema, TEvent, TInitial> {
   parallel?: boolean;
-  states: StateNodeConfig<TContext, TStateSchema, TEvent>['states'];
+  states: StateNodeConfig<TContext, TStateSchema, TEvent, TInitial>['states'];
 }
 
 export type SimpleOrCompoundStateNodeConfig<
   TContext,
   TStateSchema extends StateSchema,
-  TEvent extends EventObject
+  TEvent extends EventObject,
+  TInitial extends keyof TStateSchema['states']
 > =
   | AtomicStateNodeConfig<TContext, TEvent>
-  | CompoundStateNodeConfig<TContext, TStateSchema, TEvent>;
+  | CompoundStateNodeConfig<TContext, TStateSchema, TEvent, TInitial>;
 
 export type ActionFunctionMap<TContext, TEvent extends EventObject> = Record<
   string,
@@ -534,19 +537,34 @@ export interface MachineOptions<TContext, TEvent extends EventObject> {
   updater: Updater<TContext, TEvent>;
 }
 export interface MachineConfig<
-  TContext,
   TStateSchema extends StateSchema,
-  TEvent extends EventObject
-> extends CompoundStateNodeConfig<TContext, TStateSchema, TEvent> {
-  /**
-   * The initial context (extended state)
-   */
-  context?: TContext;
+  TEvent extends EventObject,
+  TInitial extends keyof TStateSchema['states']
+>
+  extends CompoundStateNodeConfig<
+    ContextUnionFromStateSchema<TStateSchema>,
+    TStateSchema,
+    TEvent,
+    TInitial
+  > {
   /**
    * The machine's own version.
    */
   version?: string;
 }
+
+export type GenericsFromMachineConfig<T> = T extends MachineConfig<
+  infer TStateSchema,
+  infer TEvent,
+  infer TInitial
+>
+  ? {
+      schema: TStateSchema;
+      event: TEvent;
+      context: ContextUnionFromStateSchema<TStateSchema>;
+      initial: TInitial;
+    }
+  : never;
 
 export interface StandardMachineConfig<
   TContext,
@@ -884,11 +902,6 @@ export interface StateConfig<TContext, TEvent extends EventObject> {
   tree?: StateTree;
 }
 
-export interface StateSchema {
-  meta?: any;
-  states?: Record<string | number, StateSchema>;
-}
-
 export interface InterpreterOptions {
   /**
    * Whether state actions should be executed immediately upon transition. Defaults to `true`.
@@ -916,3 +929,21 @@ export interface InterpreterOptions {
    */
   devTools: boolean;
 }
+
+export interface StateSchema {
+  meta?: any;
+  states?: Record<string | number, StateSchema>;
+  context?: any;
+}
+
+export type ContextFromStateSchema<T extends StateSchema> = T['context'];
+
+export type ContextMap<T extends StateSchema> = {
+  [K in keyof T['states']]: ContextFromStateSchema<T['states'][K]>
+};
+
+export type ContextUnion<T extends ContextMap<any>> = T[keyof T];
+
+export type ContextUnionFromStateSchema<T extends StateSchema> = ContextUnion<
+  ContextMap<T>
+>;

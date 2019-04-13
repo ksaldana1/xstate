@@ -1,25 +1,27 @@
-import {
-  StateMachine,
-  MachineOptions,
-  DefaultContext,
-  MachineConfig,
-  StateSchema,
-  EventObject
-} from './types';
 import { StateNode } from './StateNode';
+import {
+  GenericsFromMachineConfig,
+  MachineConfig,
+  MachineOptions,
+  StateMachine
+} from './types';
 
-export function Machine<
-  TContext = DefaultContext,
-  TStateSchema extends StateSchema = any,
-  TEvent extends EventObject = EventObject
->(
-  config: MachineConfig<TContext, TStateSchema, TEvent>,
-  options?: Partial<MachineOptions<TContext, TEvent>>,
-  initialContext: TContext | undefined = config.context
-): StateMachine<TContext, TStateSchema, TEvent> {
-  return new StateNode<TContext, TStateSchema, TEvent>(
-    config,
-    options,
-    initialContext
-  ) as StateMachine<TContext, TStateSchema, TEvent>;
+type G<T> = GenericsFromMachineConfig<T>;
+
+export function Machine<TConfig extends MachineConfig<any, any, any>>(
+  config: TConfig,
+  options: Partial<MachineOptions<G<TConfig>['context'], G<TConfig>['event']>>,
+  initialContext:
+    | G<TConfig>['context'][G<TConfig>['initial']]
+    | undefined = config.context
+): StateMachine<
+  G<TConfig>['context'],
+  G<TConfig>['schema'],
+  G<TConfig>['event']
+> {
+  return new StateNode<
+    G<TConfig>['context'],
+    G<TConfig>['schema'],
+    G<TConfig>['event']
+  >(config, options, initialContext);
 }
